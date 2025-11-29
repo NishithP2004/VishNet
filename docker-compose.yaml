@@ -1,0 +1,37 @@
+services: 
+
+    agent:  
+      image: nishithp/graniteecho-agent
+      context: .
+      restart: unless-stopped
+      env_file:
+        - "./agent/.env"
+      ports:
+        - "3000:3000"
+      depends_on:
+        - neo4j
+    
+    redis:  
+      image: redis:latest
+      restart: unlesss-stopped
+      ports:
+        - "6379:6379"
+      volumes:
+        - redis_data:/data
+    
+    neo4j:
+      image: neo4j:latest
+      volumes:
+          - /$HOME/neo4j/logs:/logs
+          - /$HOME/neo4j/config:/config
+          - /$HOME/neo4j/data:/data
+          - /$HOME/neo4j/plugins:/plugins
+      environment:
+          - NEO4J_AUTH=neo4j/neo4j
+      ports:
+        - "7474:7474"
+        - "7687:7687"
+      restart: always
+
+volumes:
+  redis_data:
