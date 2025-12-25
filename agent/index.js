@@ -6,7 +6,7 @@ import fastifyStatic from "@fastify/static"
 
 import ngrok from "@ngrok/ngrok"
 import agent from "./ibm_agent.js"
-import { transcribeRecording, synthesizeAgentResponseAudio, agent as langgraph_agent } from "./agent.js";
+import { transcribeRecording, synthesizeAgentResponseAudio, getLangchainAgent } from "./agent.js";
 import { UserMessage } from "beeai-framework/backend/message"
 import { SYSTEM_PROMPT, WELCOME_GREETING, PERSONA_TEMPLATES } from "./prompts.js";
 import { publishToChannel, client as redis, subscriber, channels } from "./services/redis.js";
@@ -33,7 +33,8 @@ const requestSchema = z.object({
     ph: z.string().describe("The target user's phone number"),
     name: z.string().describe("The target user's name"),
     persona: z.string().describe("The name of the persona template to be adopted by the Agent"),
-    mode: z.enum(["normal", "impersonation"]).default("normal").describe("Influences the nature of actions performed by the LLM Agent")
+    mode: z.enum(["normal", "impersonation"]).default("normal").describe("Influences the nature of actions performed by the LLM Agent"),
+    voice_id: z.string().default("Xb7hH8MSUJpSbSDYk0k2").describe("The ElevenLabs Voice ID")
 })
 
 const sessions = new Map()
@@ -97,21 +98,10 @@ fastify.register(async function (fastify) {
                             agent.memory.add(new UserMessage(`Persona: ${PERSONA_TEMPLATES[persona]}\nYou are now speaking with ${name}`))
                             agents.set(callSid, agent)
                         } else {
-                            const agent = langgraph_agent
+                            const agent = getLangchainAgent(persona.split("_")[0], name)
                             agents.set(callSid, agent)
                             const voiceId = await redis.hGet("persona", persona)
                             ws.voiceId = voiceId;
-                            /* const response = await synthesizeAgentResponseAudio({ ws, callSid, voiceId, agent }, `Hello, my name is ${name}`)
-                            updateConversationHistory(callSid, [
-                                {
-                                    role: "user",
-                                    content: `Hello, my name is ${name}`
-                                },
-                                {
-                                    role: "assistant",
-                                    content: response
-                                }
-                            ]) */
                         }
 
                         break;
@@ -189,14 +179,16 @@ function generateTranscript(callSid) {
 }
 
 fastify.post("/twiml", async (request, reply) => {
-    const { name, persona, mode } = request.query;
+    const { name, persona, mode, voice_id } = request.query;
 
     const response = new VoiceResponse()
     const connect = response.connect()
 
     const conversationRelay = connect.conversationRelay({
         url: WS_URL,
-        welcomeGreeting: WELCOME_GREETING
+        welcomeGreeting: WELCOME_GREETING,
+        ttsProvider: "ElevenLabs",
+        voice: `${voice_id}`
     })
 
     conversationRelay.parameter({
@@ -226,12 +218,12 @@ fastify.get("/personas", async (request, reply) => {
     })
 })
 
-async function createCall(ph, name, persona, mode = "normal") {
+async function createCall(ph, name, persona, mode = "normal", voice_id = "Xb7hH8MSUJpSbSDYk0k2") {
     try {
         const call = await client.calls.create({
             to: ph,
             from: process.env.TWILIO_PHONE_NUMBER,
-            url: encodeURI(`https://${DOMAIN}/twiml?persona=${persona}&name=${name}&mode=${mode}`),
+            url: encodeURI(`https://${DOMAIN}/twiml?persona=${persona}&name=${name}&mode=${mode}&voice_id=${voice_id}`),
             // statusCallback: `${process.env.HOST_URL}/twilio/status`,
             // statusCallbackMethod: "POST",
             // statusCallbackEvent: ["initiated", "answered", "completed"],
@@ -314,13 +306,10 @@ subscriber.on("message", async (channel, message) => {
         const data = JSON.parse(message).data
 
         if (channel === "create_call") {
-            const { ph, persona, name, mode } = data
+            const { ph, persona, name, mode, voice_id } = data
 
-            const call = await createCall(ph, name, persona, mode)
-            await redis.hSet(`call:${call.sid}`, "ph", ph)
-            await redis.hSet(`call:${call.sid}`, "name", name)
-            await redis.hSet(`call:${call.sid}`, "persona", persona)
-            await redis.hSet(`call:${call.sid}`, "mode", mode)
+            const call = await createCall(ph, name, persona, mode, voice_id)
+            await redis.hSet(`call:${call.sid}`, { ph, persona, name, mode, voice_id })
         } else if (channel === "separate_recording") {
             const { RecordingUrl, RecordingSid, CallSid } = data;
             const recordings = await separateTwilioRecording(RecordingUrl, RecordingSid)

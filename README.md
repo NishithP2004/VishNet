@@ -2,7 +2,8 @@
 
 VishNet is a voice-based social engineering simulation and training platform. It orchestrates AI voice phishing (vishing) scenarios using configurable persona templates, real-time LLM responses, voice cloning, call transcription, and a knowledge graph for extracting and storing sensitive entities (PII) for post-exercise analysis.
 
-> IMPORTANT: This project contains powerful social engineering capabilities. Use only for authorized security awareness training with explicit consent. Never deploy against real users without prior written approval. Remove any hard‑coded secrets before sharing the code.
+> [!IMPORTANT]
+> This project contains powerful social engineering capabilities. Use only for authorized security awareness training with explicit consent. Never deploy against real users without prior written approval. Remove any hard‑coded secrets before sharing the code.
 
 ## ✨ Key Features
 
@@ -158,17 +159,16 @@ Messages sent by server:
 - Explicitly inform participants; include opt-out instructions in real training calls.
 - Comply with all applicable privacy and telecom laws (GDPR, HIPAA, PCI DSS where relevant).
 
-## 🧪 Testing Ideas (Not Implemented Yet)
-
-- Unit tests for Redis channel publishing & handler routing.
-- Mock ElevenLabs TTS responses to validate audio pipeline without external calls.
-- Integration test: simulate full call event chain using fixture recording.
-
 ## 🚀 Future Improvements
 
-- Add automated test suite & CI workflow.
-- Implement encryption / secure vault for sensitive transcripts.
-- Add persona performance analytics dashboard.
-- Extend PII extraction with confidence scores.
-- Rate limiting & abuse detection for WebSocket prompts.
-- Replace ngrok with managed ingress (e.g., API Gateway or reverse proxy).
+VishNet has established a powerful framework for proactive cybersecurity training. The next evolution of the platform will focus on deepening agent intelligence, expanding simulation realism, and transforming training data into a strategic defensive asset.
+
+- **Adaptive Adversary Emulation:** Evolve the AI agent from a persona-driven actor to an adaptive adversary. The agent would learn from previous simulations, identifying which psychological tactics (e.g., urgency vs. authority) are most effective against specific employee roles or departments, and dynamically adjust its strategy in future training calls to target known weaknesses.
+
+- **Multi-Modal Attack Chain Simulation (Smishing-to-Vishing):** Expand simulations to reflect real-world attack chains. A future workflow could initiate an attack with an SMS (smishing) containing a link, followed by a vishing call that references the user's interaction with the text message. This would train employees to recognize the connected nature of multi-channel social engineering campaigns.
+
+- **Real-time Affective Analysis & Response:** Leverage the dual-channel audio stream for more than just transcription. Implement real-time sentiment and emotional analysis on the employee's voice to detect states like stress, confusion, or suspicion. The AI agent could then adapt its approach on-the-fly, either by de-escalating to rebuild rapport or increasing pressure if it detects vulnerability.
+
+- **Gamified De-briefing with Annotated Call Replay:** Instead of a static report, develop an interactive de-briefing module. After a simulation, the employee would be presented with an "instant replay" of the call transcript and audio, with key moments annotated by the system (e.g., *"Here, the agent created artificial urgency"* or *"This is where PII was successfully extracted"*). This provides a powerful, gamified learning experience.
+
+- **Defensive Model Training Pipeline:** Use the aggregated data from successful vishing simulations—including effective phrases, persuasion tactics, and conversation flows—as a high-quality dataset to train and fine-tune *defensive* AI models. This turns VishNet into a dual-use platform that not only trains the human firewall but also generates proprietary intelligence to power an organization's internal, real-time vishing detection systems.

@@ -5,7 +5,7 @@ import { MemorySaver } from "@langchain/langgraph"
 import { ChatGoogleGenerativeAIEx } from "@h1deya/langchain-google-genai-ex"
 import { MultiServerMCPClient } from "@langchain/mcp-adapters"
 import z from "zod"
-import { IMPERSONATION_PROMPT, SYSTEM_PROMPT, TRANSCRIPT_GENERATION_PROMPT } from "./prompts.js"
+import { IMPERSONATION_PROMPT, SYSTEM_PROMPT, TRANSCRIPT_GENERATION_PROMPT, _11labs_V3_SPEECH_INSTRUCTIONS } from "./prompts.js"
 import { randomBytes } from "node:crypto"
 // import { convertMulawBufferToBuffer } from "./utils.js"
 // import fs from "node:fs/promises"
@@ -39,12 +39,26 @@ const transcriptionAgent = createAgent({
 
 const checkpointer = new MemorySaver()
 
-const agent = createAgent({
-    model,
-    systemPrompt: SYSTEM_PROMPT + "\n\n" + IMPERSONATION_PROMPT,
-    checkpointer,
-    tools
-})
+function getLangchainAgent(botName, targetName) {
+    const agent = createAgent({
+        model,
+        systemPrompt: `
+        ${SYSTEM_PROMPT} 
+
+        ${IMPERSONATION_PROMPT}
+        
+        ${_11labs_V3_SPEECH_INSTRUCTIONS}
+        ---
+        You are impersonating a user named ${botName}. You are currently on a phone call with ${targetName}.
+        `,
+        checkpointer,
+        tools
+    })
+
+    // await fs.writeFile("diagram.png", await agent.drawMermaidPng())
+    
+    return agent;
+}
 
 async function transcribeRecording(transcript, audioBuffer) {
     try {
@@ -74,8 +88,6 @@ async function transcribeRecording(transcript, audioBuffer) {
     }
 }
 
-// await fs.writeFile("diagram.png", await agent.drawMermaidPng())
-
 /**
  * Generate the agent's text response for the given input and synthesize it to audio.
  * Writes audio to disk and notifies the websocket to play it.
@@ -90,7 +102,7 @@ async function transcribeRecording(transcript, audioBuffer) {
 async function synthesizeAgentResponseAudio(context, text, options = {}) {
     const { ws, callSid, voiceId, agent: _agent } = context;
     const {
-        ttsModelId = "eleven_multilingual_v2",
+        ttsModelId = "eleven_v3", // "eleven_multilingual_v2"
         outputFormat = "mp3_22050_32"
     } = options;
 
@@ -186,4 +198,4 @@ async function synthesizeAgentResponseAudio(context, text, options = {}) {
     }
 }
 
-export { transcribeRecording, synthesizeAgentResponseAudio, agent }
+export { transcribeRecording, synthesizeAgentResponseAudio, getLangchainAgent }
