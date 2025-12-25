@@ -4,7 +4,7 @@ import { ReActAgent } from "beeai-framework/agents/react/agent"
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai"
 import { LangChainChatModel } from "beeai-framework/adapters/langchain/backend/chat";
 import { UnconstrainedMemory } from "beeai-framework/memory/unconstrainedMemory"
-import { SYSTEM_PROMPT } from "./prompts.js"
+import { SYSTEM_PROMPT, _11labs_V3_SPEECH_INSTRUCTIONS } from "./prompts.js"
 
 /* import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
