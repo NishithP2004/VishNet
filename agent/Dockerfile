@@ -1,6 +1,7 @@
-FROM node:latest
+FROM node:24-alpine
 WORKDIR /app
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ffmpeg chromium
+ENV PUPPETEER_EXECUTABLE_PATH="/usr/bin/chromium"
 COPY package*.json .
 RUN npm ci --force
 COPY . .

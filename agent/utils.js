@@ -3,17 +3,21 @@ import fs from "node:fs"
 import path from "node:path"
 import { Readable } from "node:stream"
 import { randomBytes } from "node:crypto"
+import puppeteer from "puppeteer"
+import MarkdownIt from "markdown-it"
 import "dotenv/config"
 
 const accountSid = process.env.TWILIO_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 
-const output_dirs =["./recordings", "./temp"]
+const markdown = new MarkdownIt()
 
-for(let output_dir of output_dirs) {
+const output_dirs = ["./recordings", "./temp", "./reports"]
+
+for (let output_dir of output_dirs) {
     try {
         fs.accessSync(output_dir, fs.constants.R_OK | fs.constants.W_OK)
-    } catch(err) {
+    } catch (err) {
         fs.mkdirSync(output_dir)
     }
 }
@@ -68,7 +72,7 @@ async function downloadRecording(url, username, password) {
             .then(res => res.arrayBuffer())
 
         return Buffer.from(audioBuffer)
-    } catch(err) {
+    } catch (err) {
         console.error("Error downloading audio file from Twilio:", err)
         throw err
     }
@@ -93,8 +97,8 @@ async function extractChannel(inputPath, outputPath, channelIndex) {
     })
 }
 
-async function convertMulawBufferToBuffer(inputBuffer, format="wav", opts={}) {
-    const { sampleRate=8000, channels=1, codec } = opts;
+async function convertMulawBufferToBuffer(inputBuffer, format = "wav", opts = {}) {
+    const { sampleRate = 8000, channels = 1, codec } = opts;
 
     return new Promise((resolve, reject) => {
         const inputStream = Readable.from(inputBuffer)
@@ -104,12 +108,12 @@ async function convertMulawBufferToBuffer(inputBuffer, format="wav", opts={}) {
             .input(inputStream)
             .inputFormat("mulaw")
             .inputOptions([`-ar ${sampleRate}`, `-ac ${channels}`])
-        
-        if(codec) command.audioCodec(codec);
 
-        const ffout = command   
+        if (codec) command.audioCodec(codec);
+
+        const ffout = command
             .format(format)
-            .on('start', comd => {})
+            .on('start', comd => { })
             .on('error', err => reject(err))
             .on('end', () => {
                 resolve(Buffer.concat(outChunks))
@@ -126,8 +130,57 @@ function createAudioWriteStream(callSid) {
     const writeStream = fs.createWriteStream(`temp/${filename}`, {
         flags: "a"
     })
-   
+
     return { stream: writeStream, filename };
 }
 
-export { separateTwilioRecording, convertMulawBufferToBuffer, createAudioWriteStream };
+async function convertToPdf(md, callSid) {
+    try {
+        const content = markdown.render(md)
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; margin: 40px; }
+                    h1 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+                    h2 { color: #34495e; margin-top: 30px; }
+                    table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+                    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+                    th { background-color: #f8f9fa; }
+                    tr:nth-child(even) { background-color: #f9f9f9; }
+                    blockquote { border-left: 4px solid #3498db; margin: 0; padding-left: 20px; color: #7f8c8d; }
+                    code { background-color: #f4f4f4; padding: 2px 5px; border-radius: 3px; }
+                </style>
+            </head>
+            <body>
+                ${content}
+            </body>
+            </html>
+        `;
+
+        const browser = await puppeteer.launch({
+            headless: "new",
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        const page = await browser.newPage();
+        await page.setContent(html, {
+            waitUntil: "load"
+        });
+        let pdf = await page.pdf({
+            format: "A4"
+        });
+
+        await browser.close();
+
+        let filename = `report_${callSid}.pdf`
+        fs.writeFileSync(`./reports/${filename}`, Buffer.from(pdf))
+
+        return filename;
+    } catch(err) {
+        console.error("Error converting the provided markdown content to pdf format:", err.message)
+        throw err
+    }
+}
+
+export { separateTwilioRecording, convertMulawBufferToBuffer, createAudioWriteStream, convertToPdf };

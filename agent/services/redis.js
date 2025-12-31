@@ -22,12 +22,12 @@ await Promise.all([
     publisher.connect()
 ]).then(() => console.log("Connected to Redis successfully.")).catch(err => console.error)
 
-const channels = ["create_call", "separate_recording", "transcribe_recording", "update_knowledge_graph", "create_voice_clone"]
+const channels = ["create_call", "separate_recording", "transcribe_recording", "generate_report", "send_report", "create_voice_clone"]
 
 async function publishToChannel(channel, data) {
     await publisher.publish(channel, JSON.stringify({
         id: v4(),
-        date: new Date(),
+        timestamp: new Date().getTime(),
         data
     }))
 }

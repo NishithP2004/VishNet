@@ -5,7 +5,7 @@ import { MemorySaver } from "@langchain/langgraph"
 import { ChatGoogleGenerativeAIEx } from "@h1deya/langchain-google-genai-ex"
 import { MultiServerMCPClient } from "@langchain/mcp-adapters"
 import z from "zod"
-import { IMPERSONATION_PROMPT, SYSTEM_PROMPT, TRANSCRIPT_GENERATION_PROMPT, _11labs_V3_SPEECH_INSTRUCTIONS } from "./prompts.js"
+import { IMPERSONATION_PROMPT, SYSTEM_PROMPT, TRANSCRIPT_GENERATION_PROMPT, _11labs_V3_SPEECH_INSTRUCTIONS, REPORT_GENERATION_PROMPT } from "./prompts.js"
 import { randomBytes } from "node:crypto"
 // import { convertMulawBufferToBuffer } from "./utils.js"
 // import fs from "node:fs/promises"
@@ -14,7 +14,7 @@ import { Readable } from "node:stream"
 import { client as _11labs } from "./services/11labs.js"
 
 const model = new ChatGoogleGenerativeAIEx({ // new ChatGoogleGenerativeAI({})
-    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    model: process.env.GEMINI_MODEL || "gemini-flash-latest",
     temperature: 0.7
 })
 
@@ -34,6 +34,14 @@ const transcriptionAgent = createAgent({
     tools,
     responseFormat: toolStrategy(z.object({
         transcript: z.string()
+    }))
+})
+
+const reportGenerationAgent = createAgent({
+    model,
+    systemPrompt: REPORT_GENERATION_PROMPT,
+    responseFormat: toolStrategy(z.object({
+        report: z.string()
     }))
 })
 
@@ -88,6 +96,34 @@ async function transcribeRecording(transcript, audioBuffer) {
     }
 }
 
+async function generateReport(transcript, audioBuffer) {
+    try {
+        const humanMessage = new HumanMessage({
+            content: [
+                {
+                    type: "text",
+                    text: transcript
+                },
+                {
+                    type: "audio",
+                    source_type: "base64",
+                    mime_type: "audio/wav",
+                    data: audioBuffer
+                }
+            ]
+        })
+
+        const result = await reportGenerationAgent.invoke({
+            messages: humanMessage
+        })
+
+        return result.structuredResponse
+    } catch (err) {
+        console.error("Error generating report:", err.message)
+        throw err
+    }
+}
+
 /**
  * Generate the agent's text response for the given input and synthesize it to audio.
  * Writes audio to disk and notifies the websocket to play it.
@@ -106,7 +142,7 @@ async function synthesizeAgentResponseAudio(context, text, options = {}) {
         outputFormat = "mp3_22050_32"
     } = options;
 
-    const selectedVoiceId = voiceId || process.env.ELEVENLABS_VOICE_ID || "Xb7hH8MSUJpSbSDYk0k2";
+    const selectedVoiceId = voiceId || process.env.ELEVENLABS_VOICE_ID;
 
     // Prepare output file stream
     const { stream: audioWriteStream, filename } = createAudioWriteStream(callSid);
@@ -141,7 +177,8 @@ async function synthesizeAgentResponseAudio(context, text, options = {}) {
             }
         }
 
-        const aiResponse = chunks.join("");
+        const jsonRegex = /\{.+\}/gm;
+        const aiResponse = chunks.join("").replaceAll(jsonRegex, "");
 
         // Convert to speech using ElevenLabs
         const audio = await _11labs.textToSpeech.convert(selectedVoiceId, {
@@ -198,4 +235,4 @@ async function synthesizeAgentResponseAudio(context, text, options = {}) {
     }
 }
 
-export { transcribeRecording, synthesizeAgentResponseAudio, getLangchainAgent }
+export { transcribeRecording, synthesizeAgentResponseAudio, getLangchainAgent, generateReport }
